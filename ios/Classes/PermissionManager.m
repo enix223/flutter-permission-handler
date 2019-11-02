@@ -42,35 +42,38 @@
         
         id <PermissionStrategy> permissionStrategy = [PermissionManager createPermissionStrategy:permission];
         [_strategyInstances addObject:permissionStrategy];
-        
-        
-        [permissionStrategy requestPermission:permission completionHandler:^(PermissionStatus permissionStatus) {
-            permissionStatusResult[@(permission)] = @(permissionStatus);
-            [requestQueue removeObject:@(permission)];
-            
-            [self->_strategyInstances removeObject:permissionStrategy];
-            
-            if (requestQueue.count == 0) {
-                completion(permissionStatusResult);
-                return;
-            }
-        }];
+
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            [permissionStrategy requestPermission:permission completionHandler:^(PermissionStatus permissionStatus) {
+                permissionStatusResult[@(permission)] = @(permissionStatus);
+                [requestQueue removeObject:@(permission)];
+                
+                [self->_strategyInstances removeObject:permissionStrategy];
+                
+                if (requestQueue.count == 0) {
+                    completion(permissionStatusResult);
+                    return;
+                }
+            }];
+        });
     }
 }
 
 + (void)openAppSettings:(FlutterResult)result {
-    if (@available(iOS 10, *)) {
-        [[UIApplication sharedApplication] openURL:[NSURL URLWithString:UIApplicationOpenSettingsURLString]
-                                           options:[[NSDictionary alloc] init]
-                                 completionHandler:^(BOOL success) {
-                                     result([[NSNumber alloc] initWithBool:success]);
-                                 }];
-    } else if (@available(iOS 8.0, *)) {
-        BOOL success = [[UIApplication sharedApplication] openURL:[NSURL URLWithString:UIApplicationOpenSettingsURLString]];
-        result([[NSNumber alloc] initWithBool:success]);
-    } else {
-        result(@false);
-    }
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        if (@available(iOS 10, *)) {
+            [[UIApplication sharedApplication] openURL:[NSURL URLWithString:UIApplicationOpenSettingsURLString]
+                                            options:[[NSDictionary alloc] init]
+                                    completionHandler:^(BOOL success) {
+                                        result([[NSNumber alloc] initWithBool:success]);
+                                    }];
+        } else if (@available(iOS 8.0, *)) {
+            BOOL success = [[UIApplication sharedApplication] openURL:[NSURL URLWithString:UIApplicationOpenSettingsURLString]];
+            result([[NSNumber alloc] initWithBool:success]);
+        } else {
+            result(@false);
+        }
+    });
 }
 
 + (id)createPermissionStrategy:(PermissionGroup)permission {
